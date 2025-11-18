@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "290097347317",
+    "project_id": "muni-5ec79",
+    "storage_bucket": "muni-5ec79.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:290097347317:android:0fc8f330daad16052d63bc",
+        "android_client_info": {
+          "package_name": "com.muni.incidencias"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQ1lqK8DwuL3fRkuxHScYwyP4sKA1-Jws"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
