@@ -6,6 +6,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 
+import 'package:muni_incidencias/main.dart';
+
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -15,29 +17,29 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
-  /// 🔥 Inicialización global
-  Future<void> init() async {
-    // ⭐ Permiso obligatorio en Android 13+
-    if (Platform.isAndroid) {
-      await _fcm.requestPermission(alert: true, badge: true, sound: true);
-    }
+ Future<void> init() async {
+  // ✅ 1. Registrar handler background (¡primero que todo!)
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    // 🔔 Crear canal obligatorio Android
-    await _createNotificationChannel();
-
-    // 🎧 Listener foreground
-    FirebaseMessaging.onMessage.listen(_onForegroundMessage);
-
-    // 🎧 Listener cuando abres una notificación
-    FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
-
-    // 🔧 Inicializar notificaciones locales
-    await _configureLocalNotifications();
-
-    // 🔄 Guardar token
-    _fcm.onTokenRefresh.listen(_saveTokenToFirestore);
-    _saveTokenToFirestore(await _fcm.getToken());
+  // ✅ 2. Permiso (solo foreground)
+  if (Platform.isAndroid) {
+    await _fcm.requestPermission(alert: true, badge: true, sound: true);
   }
+
+  // ✅ 3. Canal Android
+  await _createNotificationChannel();
+
+  // ✅ 4. Listeners foreground
+  FirebaseMessaging.onMessage.listen(_onForegroundMessage);
+  FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
+
+  // ✅ 5. Notificaciones locales
+  await _configureLocalNotifications();
+
+  // ✅ 6. Token
+  _fcm.onTokenRefresh.listen(_saveTokenToFirestore);
+  _saveTokenToFirestore(await _fcm.getToken());
+}
 
   Future<void> _configureLocalNotifications() async {
     const AndroidInitializationSettings androidSettings =
