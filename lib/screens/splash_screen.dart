@@ -17,33 +17,34 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fade;
+  late Animation<double> _scale;
 
   @override
   void initState() {
     super.initState();
 
-    // Animaciones mejoradas
+    // 🔥 Animación estilo iOS 2025
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    _fade = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutExpo,
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    _scale = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutBack,
+      ),
     );
 
     _controller.forward();
 
-    // Retraso de 3 segundos para iniciar el proceso de verificación de sesión
+    // Esperar 3 segundos para verificar sesión
     Timer(const Duration(seconds: 3), _verificarInicioSesion);
   }
 
@@ -90,47 +91,96 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
+  // 🌟 DISEÑO iOS 2025
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF004D40), // Color de fondo más atractivo
+      backgroundColor: Colors.white, // Fondo blanco ultra limpio
       body: Center(
         child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
+          opacity: _fade,
+          child: ScaleTransition(
+            scale: _scale,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.asset(
-                  'assets/img/logo_reque.png',
-                  width: 160, // Tamaño más grande para el logo
-                  height: 160,
-                ),
-                const SizedBox(height: 30),
-                const Text(
-                  'Municipalidad Distrital de Reque',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'Montserrat', // Mantengo la fuente Montserrat
-                    fontSize: 24, // Título más grande y atractivo
-                    fontWeight: FontWeight.w600, // Peso de fuente moderado
+                // 🌿 Card flotante con sombra Apple-style
+                Container(
+                  padding: const EdgeInsets.all(26),
+                  decoration: BoxDecoration(
                     color: Colors.white,
-                    letterSpacing: 1.2, // Espaciado entre letras para mayor legibilidad
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.2),
+                        blurRadius: 40,
+                        offset: const Offset(0, 18),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Logo con animación moderna
+                      Hero(
+                        tag: "logo",
+                        child: Image.asset(
+                          'assets/img/logo_reque.png',
+                          width: 130,
+                          height: 130,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      const Text(
+                        'Municipalidad Distrital de Reque',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Montserrat',
+                          color: Colors.black87,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 40),
-                const CircularProgressIndicator(
-                  strokeWidth: 4, // Indicador de carga más grueso para visibilidad
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Cargando...',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontFamily: 'Montserrat',
-                    fontSize: 16, // Mejor tamaño de fuente para el texto de carga
+
+                const SizedBox(height: 60),
+
+                // 🔄 Indicador de carga estilo iOS + glass effect
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 26, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.green.withOpacity(0.25),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation(Colors.green),
+                        ),
+                      ),
+                      SizedBox(width: 14),
+                      Text(
+                        'Cargando...',
+                        style: TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontSize: 16,
+                          color: Colors.black87,
+                        ),
+                      )
+                    ],
                   ),
                 ),
               ],

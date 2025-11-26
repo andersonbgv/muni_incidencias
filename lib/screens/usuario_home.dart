@@ -1,11 +1,104 @@
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'login_screen.dart';
 import 'scan_qr_screen.dart';
 import 'mis_reportes_screen.dart';
-class UsuarioHome extends StatelessWidget {
+import 'guia_uso.dart';
+import '../utils/role_validator.dart';
+
+class UsuarioHome extends StatefulWidget {
   const UsuarioHome({super.key});
+
+  @override
+  State<UsuarioHome> createState() => _UsuarioHomeState();
+}
+
+class _UsuarioHomeState extends State<UsuarioHome> with TickerProviderStateMixin {
+  int _currentIndex = 0;
+  String? _nombreUsuario;
+  bool _loadingNombre = true;
+
+  // 🌿 NUEVA PALETA – VERDE PROFESIONAL
+  static const Color primaryDark = Color(0xFF0D4D3C);      // Verde oscuro elegante
+  static const Color primaryMedium = Color(0xFF157F62);    // Verde medio (principal)
+  static const Color accentGold = Color(0xFFF2C94C);       // Dorado elegante
+  static const Color backgroundLight = Color(0xFFF7F9F9);  // Gris claro
+  static const Color cardBackground = Colors.white;
+  static const Color textPrimary = Color(0xFF1E1F20);
+  static const Color textSecondary = Color(0xFF6F7173);
+  static const Color divider = Color(0xFFE2E5E6);
+
+  Timer? _relojTimer;
+  DateTime _horaActual = DateTime.now();
+
+  @override
+  void initState() {
+    _validateAndLoad();
+    super.initState();
+    _startReloj();
+  }
+
+  @override
+  void dispose() {
+    _relojTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _validateAndLoad() async {
+    final isValid = await validateUserRole(
+      context,
+      allowedRoles: ['usuario'],
+    );
+    if (isValid) {
+      _cargarNombreUsuario();
+    }
+  }
+
+  void _startReloj() {
+    _relojTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _horaActual = DateTime.now();
+        });
+      }
+    });
+  }
+
+  Future<void> _cargarNombreUsuario() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      setState(() {
+        _nombreUsuario = "Usuario";
+        _loadingNombre = false;
+      });
+      return;
+    }
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists) {
+        _nombreUsuario = doc.data()?['nombre'] ?? "Usuario";
+      } else {
+        _nombreUsuario = user.email?.split('@').first ?? "Usuario";
+      }
+    } catch (e) {
+      _nombreUsuario = "Usuario";
+    }
+
+    if (mounted) {
+      setState(() => _loadingNombre = false);
+    }
+  }
 
   Future<void> _cerrarSesion(BuildContext context) async {
     await FirebaseAuth.instance.signOut();
@@ -18,159 +111,363 @@ class UsuarioHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const verdeBandera = Color(0xFF006400);
-
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        centerTitle: true,
-        backgroundColor: verdeBandera,
-        elevation: 3,
-        title: const Text(
-          'Panel del Usuario',
-          style: TextStyle(
-            fontFamily: 'Montserrat',
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Cerrar sesión',
-            onPressed: () => _cerrarSesion(context),
-            icon: const Icon(Icons.logout, color: Colors.white),
+      backgroundColor: backgroundLight,
+      body: Column(
+        children: [
+          if (_currentIndex == 0) _buildHeaderGradient(),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              child: _buildPage(),
+            ),
           ),
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.white, Color(0xFFE8F5E9)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
+      bottomNavigationBar: _buildBottomMenu(),
+    );
+  }
+
+  // HEADER VERDE PROFESIONAL
+  Widget _buildHeaderGradient() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 45, 20, 35),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [primaryDark, primaryMedium],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(26),
+          bottomRight: Radius.circular(26),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const SizedBox(height: 10),
-              Text(
-                'Bienvenido al módulo de incidencias',
-                style: const TextStyle(
-                  fontFamily: 'Montserrat',
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: verdeBandera,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Selecciona una opción para continuar',
-                style: TextStyle(
-                  fontFamily: 'Montserrat',
-                  fontSize: 14,
-                  color: Colors.black54,
-                ),
-              ),
-              const SizedBox(height: 25),
-
-              // Cuadrícula de opciones
-              Expanded(
-                child: GridView.count(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 18,
-                  crossAxisSpacing: 18,
-                  childAspectRatio: 1.1,
-                  children: [
-                    _buildCard(
-  icon: FontAwesomeIcons.bug,
-  title: 'Reportar Incidencia',
-  color: verdeBandera,
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const ScanQrScreen()),
-    );
-  },
-),
-
-                   _buildCard(
-  icon: FontAwesomeIcons.clipboardList,
-  title: 'Mis Reportes',
-  color: Colors.teal.shade700,
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const MisReportesScreen()),
-    );
-  },
-),
-                    _buildCard(
-                      icon: FontAwesomeIcons.bell,
-                      title: 'Notificaciones',
-                      color: Colors.orange.shade800,
-                      onTap: () {
-                        // TODO: Ver alertas o actualizaciones
-                      },
-                    ),
-                    _buildCard(
-                      icon: FontAwesomeIcons.infoCircle,
-                      title: 'Guía de Uso',
-                      color: Colors.blue.shade700,
-                      onTap: () {
-                        // TODO: Mostrar guía rápida o tutorial
-                      },
-                    ),
-                  ],
+              const SizedBox(),
+              InkWell(
+                onTap: () => _cerrarSesion(context),
+                borderRadius: BorderRadius.circular(50),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.logout, color: Colors.white),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 15),
+          Text(
+            "Hola,",
+            style: TextStyle(
+              fontFamily: "Montserrat",
+              fontSize: 26,
+              color: Colors.white.withOpacity(0.9),
+            ),
+          ),
+          _loadingNombre
+              ? const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(Colors.white),
+                    ),
+                  ),
+                )
+              : Text(
+                  "$_nombreUsuario 👋",
+                  style: const TextStyle(
+                    fontFamily: "Montserrat",
+                    fontSize: 31,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+          const SizedBox(height: 8),
+          Text(
+            "¿Qué vas a reportar hoy?",
+            style: TextStyle(
+              fontFamily: "Montserrat",
+              fontSize: 16,
+              color: Colors.white.withOpacity(0.9),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // MENU INFERIOR VERDE
+  Widget _buildBottomMenu() {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: BottomNavigationBar(
+          elevation: 9,
+          currentIndex: _currentIndex,
+          backgroundColor: Colors.white.withOpacity(0.93),
+          selectedItemColor: primaryMedium,
+          unselectedItemColor: textSecondary,
+          type: BottomNavigationBarType.fixed,
+          onTap: (index) => setState(() => _currentIndex = index),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              label: "Inicio",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.qr_code_scanner),
+              label: "Scan QR",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.list_alt_outlined),
+              label: "Reportes",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.info_outline),
+              label: "Guía",
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// 🧱 Tarjeta reutilizable para opciones del usuario
-  Widget _buildCard({
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildPage() {
+    switch (_currentIndex) {
+      case 1:
+        return const ScanQrScreen();
+      case 2:
+        return const MisReportesScreen();
+      case 3:
+        return const GuiaUsoScreen();
+      default:
+        return _buildHomeContent();
+    }
+  }
+
+  Widget _buildHomeContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildRelojCard(),
+          const SizedBox(height: 20),
+          _buildMarketingBanner(),
+          const SizedBox(height: 25),
+          _buildMainActionButton(),
+        ],
+      ),
+    );
+  }
+
+  // RELOJ – VERDE PREMIUM + DORADO
+  Widget _buildRelojCard() {
+    final now = _horaActual;
+
+    final dias = [
+      'Lunes', 'Martes', 'Miércoles', 'Jueves',
+      'Viernes', 'Sábado', 'Domingo'
+    ];
+
+    final meses = [
+      'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+      'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
+    ];
+
+    String diaSemana = dias[now.weekday - 1];
+    String fechaStr = '${now.day} de ${meses[now.month - 1]}';
+    String horaStr =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [primaryDark, primaryMedium],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black26.withOpacity(0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    diaSemana,
+                    style: const TextStyle(
+                      fontFamily: "Montserrat",
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    fechaStr,
+                    style: const TextStyle(
+                      fontFamily: "Montserrat",
+                      fontSize: 16,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: accentGold.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  horaStr,
+                  style: TextStyle(
+                    fontFamily: "Montserrat",
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: accentGold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          LinearProgressIndicator(
+            value:
+                (now.hour * 3600 + now.minute * 60 + now.second) / 86400,
+            backgroundColor: Colors.white24,
+            color: accentGold,
+            minHeight: 6,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // BANNER – FONDO BLANCO + VERDE
+  Widget _buildMarketingBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cardBackground,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: divider, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: primaryMedium.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.lightbulb,
+                  color: primaryMedium,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  "¿Sabías que reiniciar tu equipo soluciona la mayoría de fallos comunes?",
+                  style: const TextStyle(
+                    fontFamily: "Montserrat",
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "Mantén tus equipos funcionando y reporta cualquier incidencia.",
+            style: TextStyle(
+              fontFamily: "Montserrat",
+              fontSize: 14,
+              color: textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // BOTÓN PRINCIPAL – VERDE PREMIUM
+  Widget _buildMainActionButton() {
     return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      splashColor: color.withOpacity(0.2),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      borderRadius: BorderRadius.circular(22),
+      onTap: () => setState(() => _currentIndex = 1),
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        width: double.infinity,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: Colors.white,
+          gradient: const LinearGradient(
+            colors: [primaryMedium, primaryDark],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.15),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 10,
-              offset: const Offset(0, 4),
+              offset: const Offset(0, 5),
             ),
           ],
         ),
-        padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 42, color: color),
-            const SizedBox(height: 15),
+          children: const [
+            Icon(FontAwesomeIcons.bug, size: 55, color: Colors.white),
+            SizedBox(height: 18),
             Text(
-              title,
-              textAlign: TextAlign.center,
+              "Registrar Incidencia",
               style: TextStyle(
                 fontFamily: 'Montserrat',
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: color,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
               ),
             ),
           ],

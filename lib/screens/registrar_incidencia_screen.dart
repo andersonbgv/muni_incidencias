@@ -109,96 +109,134 @@ class _RegistrarIncidenciaScreenState extends State<RegistrarIncidenciaScreen> {
     });
   }
 
-  // 📝 Registrar incidencia en Firestore
-  Future<void> registrarIncidencia() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+// 📝 Registrar incidencia en Firestore + notificar al jefe
+// 📝 Registrar incidencia en Firestore + notificar al jefe
+Future<void> registrarIncidencia() async {
+  // 🕒 Log breve (solo en debug)
+  print("🚀 Registrando incidencia...");
+
+  // 🔒 Verificar contexto
+  if (!mounted) return;
+
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('❌ Sesión expirada. Inicia sesión nuevamente.')),
+        const SnackBar(content: Text('❌ Sesión expirada')),
       );
-      Navigator.pop(context); // Vuelve al login si no hay usuario
-      return;
+      Navigator.maybePop(context);
+    }
+    return;
+  }
+
+  final descripcion = descripcionController.text.trim();
+  if (descripcion.isEmpty) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('⚠️ Describe la incidencia')),
+      );
+    }
+    return;
+  }
+
+  setState(() => loading = true);
+
+  try {
+    // 🖼️ Subir imágenes (si hay)
+    List<String> urlsCloudinary = [];
+    for (final imagen in imagenes) {
+      if (!mounted) return;
+      final url = await subirImagenACloudinary(imagen);
+      if (url != null) urlsCloudinary.add(url);
     }
 
-    final descripcion = descripcionController.text.trim();
-    if (descripcion.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Por favor, describe la incidencia.')),
-      );
-      return;
+    final equipo = widget.equipoData;
+
+    // 📄 Datos de incidencia
+    final incidenciaData = {
+      'id_equipo': equipo['id_equipo'] as String,
+      'nombre_equipo': equipo['nombre'] as String,
+      'area': equipo['area_nombre'] as String,
+      'descripcion': descripcion,
+      'imagenes': urlsCloudinary,
+      'fecha_reporte': Timestamp.now(),
+      'estado': 'Pendiente',
+      'usuario_reportante_id': user.uid,
+      'usuario_reportante_email': user.email ?? '—',
+      'usuario_reportante_nombre': 
+          user.displayName ?? user.email?.split('@').first ?? 'Usuario',
+    };
+
+    // ✅ Guardar incidencia
+    final incidenciaDoc = await FirebaseFirestore.instance
+        .collection('incidencias')
+        .add(incidenciaData);
+
+    // 🔔 Notificar a jefes
+    final jefes = await FirebaseFirestore.instance
+        .collection('usuarios')
+        .where('rol', isEqualTo: 'jefe')
+        .get();
+
+    for (final jefe in jefes.docs) {
+      if (!mounted) break;
+      await FirebaseFirestore.instance
+          .collection('notificaciones')
+          .doc(jefe.id)
+          .collection('inbox')
+          .add({
+        'tipo': 'nueva_incidencia',
+        'titulo': '🆕 Nueva incidencia reportada',
+        'cuerpo': 'En "${equipo['nombre']}" (${equipo['area_nombre']})',
+        'incidencia_id': incidenciaDoc.id,
+        'equipo_id': equipo['id_equipo'],
+        'timestamp': Timestamp.now(),
+        'leido': false,
+        'usuario_reportante_nombre': incidenciaData['usuario_reportante_nombre'],
+      });
     }
 
-    setState(() => loading = true);
-
-    try {
-      // 🔹 Subir imágenes (si hay)
-      List<String> urlsCloudinary = [];
-      for (int i = 0; i < imagenes.length; i++) {
-        final url = await subirImagenACloudinary(imagenes[i]);
-        if (url != null) {
-          urlsCloudinary.add(url);
-        } else {
-          // Opcional: advertir si alguna falla, pero no detener el registro
-          print('Advertencia: imagen ${i + 1} no se pudo subir');
-        }
-      }
-
-      final equipo = widget.equipoData;
-
-      // 🔹 Guardar incidencia en Firestore
-      final incidenciaData = {
-        'id_equipo': equipo['id_equipo'] as String,
-        'nombre_equipo': equipo['nombre'] as String,
-        'area': equipo['area_nombre'] as String,
-        'descripcion': descripcion,
-        'imagenes': urlsCloudinary,
-        'fecha_reporte': Timestamp.now(),
-        'estado': 'Pendiente',
-
-        // ✅ DATOS DEL USUARIO REPORTANTE (clave para reportes)
-        'usuario_reportante_id': user.uid,
-        'usuario_reportante_email': user.email ?? 'email_no_disponible',
-        'usuario_reportante_nombre': 
-            user.displayName ??
-            user.email?.split('@').first ??
-            'Usuario sin nombre',
-      };
-
-      await FirebaseFirestore.instance.collection('incidencias').add(incidenciaData);
-
-      // ✅ Éxito
+    // ✅ Éxito + navegación segura
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✅ Incidencia registrada correctamente'),
+          content: Text('✅ Incidencia registrada'),
           backgroundColor: Colors.green,
         ),
       );
 
-      // Limpiar campos y volver
+      // Limpiar
       descripcionController.clear();
       setState(() {
         imagenes.clear();
+        loading = false;
       });
 
-      if (mounted) Navigator.pop(context);
-
-    } catch (e) {
-      final errorMsg = e is FirebaseException
-          ? 'Error Firestore: ${e.message}'
-          : 'Error inesperado: $e';
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ $errorMsg'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+      // 🔁 Navegación robusta: vuelve a UsuarioHome
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          // 👇 Usa esta ruta → debe existir en main.dart
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/usuario_home', // ← ¡CRÍTICO! Debe estar en routes
+            (route) => false,
+          );
+        }
+      });
     }
+
+  } catch (e) {
+    if (mounted) {
+      final msg = e is FirebaseException ? e.message ?? 'Error' : '$e';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ $msg'), backgroundColor: Colors.red),
+      );
+    }
+  } finally {
+    if (mounted && loading) setState(() => loading = false);
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -206,22 +244,25 @@ class _RegistrarIncidenciaScreenState extends State<RegistrarIncidenciaScreen> {
     final equipo = widget.equipoData;
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: verdeBandera,
-        title: const Text(
-          'Registrar Incidencia',
-          style: TextStyle(
-            fontFamily: 'Montserrat',
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+    appBar: AppBar(
+  backgroundColor: const Color(0xFF006400), // verdeBandera
+  elevation: 0,
+  centerTitle: true,
+  leading: IconButton(
+    icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+    onPressed: () => Navigator.pop(context),
+  ),
+  title: const Text(
+    'Registrar Incidencia',
+    style: TextStyle(
+      fontFamily: 'Montserrat',
+      fontWeight: FontWeight.bold,
+      color: Colors.white,
+      fontSize: 18,
+    ),
+  ),
+),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(

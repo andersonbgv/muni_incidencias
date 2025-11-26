@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../services/auth_service.dart';
-import 'validar_codigo_screen.dart';
 import 'admin_home.dart';
 import 'tecnico_home.dart';
 import 'usuario_home.dart';
+import 'onboarding_registro.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,7 +18,45 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final emailController = TextEditingController();
   final passController = TextEditingController();
+
   bool loading = false;
+  bool _obscurePassword = true;
+  bool _rememberSession = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('email') ?? '';
+    final savedPass = prefs.getString('password') ?? '';
+    final shouldRemember = prefs.getBool('remember_session') ?? false;
+
+    if (shouldRemember && savedEmail.isNotEmpty) {
+      setState(() {
+        emailController.text = savedEmail;
+        passController.text = savedPass;
+        _rememberSession = true;
+      });
+    }
+  }
+
+  Future<void> _saveCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (_rememberSession) {
+      await prefs.setString('email', emailController.text.trim());
+      await prefs.setString('password', passController.text.trim());
+      await prefs.setBool('remember_session', true);
+    } else {
+      await prefs.remove('email');
+      await prefs.remove('password');
+      await prefs.setBool('remember_session', false);
+    }
+  }
 
   Future<void> _login() async {
     final email = emailController.text.trim();
@@ -32,17 +72,20 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => loading = true);
 
     try {
+      await _saveCredentials();
+
       final rol = await AuthService().signIn(email, pass);
 
       if (rol == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Usuario no registrado o credenciales incorrectas.')),
+          const SnackBar(content: Text('Usuario o credenciales incorrectas')),
         );
         setState(() => loading = false);
         return;
       }
 
       Widget destino;
+
       if (rol == 'admin' || rol == 'jefe') {
         destino = const AdminHome();
       } else if (rol == 'tecnico') {
@@ -51,9 +94,14 @@ class _LoginScreenState extends State<LoginScreen> {
         destino = const UsuarioHome();
       }
 
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => destino));
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => destino),
+      );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     } finally {
       setState(() => loading = false);
     }
@@ -63,200 +111,232 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     const verde = Color(0xFF006400);
 
+    final height = MediaQuery.of(context).size.height;
+    final width = MediaQuery.of(context).size.width;
+    final isSmall = height < 700;
+
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // ======= Fondo superior con degradado =======
-          Container(
-            height: 350,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0xFF0A7A3F),
-                  Color(0xFF006400),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-
-          // ===== Logo centrado =====
-          Positioned(
-            top: 70,
-            left: 0,
-            right: 0,
-            child: Column(
-              children: [
-                Image.asset('assets/img/logo_reque.png', width: 95),
-                const SizedBox(height: 12),
-                const Text(
-                  "Municipalidad Distrital de Reque",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: "Montserrat",
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
+            children: [
+              // ===== Fondo verde =====
+              Container(
+                height: height * 0.38,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF0A7A3F), Color(0xFF006400)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
                 ),
-              ],
-            ),
-          ),
-
-          // ======== Card blanca inferior ========
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              height: MediaQuery.of(context).size.height * 0.70,
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(36),
-                  topRight: Radius.circular(36),
-                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ===== TITULO =====
-                  const Text(
-                    "Bienvenido",
-                    style: TextStyle(
-                      fontFamily: "Montserrat",
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: verde,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    "Ingrese sus credenciales para continuar",
-                    style: TextStyle(
-                      color: Colors.black54,
-                      fontSize: 14,
-                      fontFamily: "Montserrat",
-                    ),
-                  ),
 
-                  const SizedBox(height: 32),
-
-                  // ======= INPUT Correo =======
-                  _inputField(
-                    label: "Correo institucional",
-                    icon: FontAwesomeIcons.envelope,
-                    controller: emailController,
-                    isPassword: false,
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  // ======= INPUT Contraseña =======
-                  _inputField(
-                    label: "Contraseña",
-                    icon: FontAwesomeIcons.lock,
-                    controller: passController,
-                    isPassword: true,
-                  ),
-
-                  const SizedBox(height: 26),
-
-                  // ======= BOTÓN INICIAR SESIÓN =======
-                  SizedBox(
-                    width: double.infinity,
-                    child: Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF008C4A),
-                            Color(0xFF006400),
-                          ],
-                        ),
+              // ===== Logo =====
+              Positioned(
+                top: isSmall ? 40 : 70,
+                left: 0,
+                right: 0,
+                child: Column(
+                  children: [
+                    Image.asset('assets/img/logo_reque.png', width: width * 0.22),
+                    const SizedBox(height: 12),
+                    const Text(
+                      "Municipalidad Distrital de Reque",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: "Montserrat",
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
                       ),
-                      child: ElevatedButton(
-                        onPressed: loading ? null : _login,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ===== Tarjeta inferior =====
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  height: isSmall ? height * 0.72 : height * 0.65,
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 26),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(36),
+                      topRight: Radius.circular(36),
+                    ),
+                  ),
+
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ===== Título =====
+                        const Text(
+                          "Bienvenido",
+                          style: TextStyle(
+                            fontFamily: "Montserrat",
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: verde,
                           ),
                         ),
-                        child: loading
-                            ? const SizedBox(
-                                height: 22,
-                                width: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                "Iniciar Sesión",
-                                style: TextStyle(
-                                  fontFamily: "Montserrat",
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                  color: Colors.white,
-                                ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          "Ingrese sus credenciales para continuar",
+                          style: TextStyle(
+                            fontFamily: "Montserrat",
+                            fontSize: 14,
+                            color: Colors.black54,
+                          ),
+                        ),
+
+                        const SizedBox(height: 26),
+
+                        // ===== Email =====
+                        _inputField(
+                          label: "Correo institucional",
+                          icon: FontAwesomeIcons.envelope,
+                          controller: emailController,
+                          isPassword: false,
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // ===== Password =====
+                        _passwordField(),
+
+                        const SizedBox(height: 6),
+
+                        CheckboxListTile(
+                          title: const Text(
+                            "Recordar sesión",
+                            style: TextStyle(fontFamily: "Montserrat"),
+                          ),
+                          value: _rememberSession,
+                          onChanged: (v) =>
+                              setState(() => _rememberSession = v ?? false),
+                          activeColor: verde,
+                          checkColor: Colors.white,
+                          contentPadding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        // ===== Botón login =====
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: loading ? null : _login,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: verde,
+                              minimumSize: const Size(0, 50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // ======= Olvidaste tu contraseña (con ícono) =======
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(FontAwesomeIcons.circleQuestion, size: 16, color: verde),
-                      label: const Text(
-                        "¿Olvidaste tu contraseña?",
-                        style: TextStyle(
-                          color: verde,
-                          fontFamily: "Montserrat",
+                            ),
+                            child: loading
+                                ? const SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                        color: Colors.white, strokeWidth: 2),
+                                  )
+                                : const Text(
+                                    "Iniciar Sesión",
+                                    style: TextStyle(
+                                      fontFamily: "Montserrat",
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
 
-                  const SizedBox(height: 10),
+                        const SizedBox(height: 10),
 
-                  // ======= Registrar usuario (con ícono) =======
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ValidarOnboardingScreen()),
-                        );
-                      },
-                      icon: const Icon(FontAwesomeIcons.userPlus, size: 16, color: verde),
-                      label: const Text(
-                        "Registrar nuevo usuario",
-                        style: TextStyle(
-                          color: verde,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: "Montserrat",
+                        Center(
+                          child: TextButton.icon(
+                            onPressed: () {},
+                            icon: const Icon(FontAwesomeIcons.circleQuestion,
+                                size: 16, color: verde),
+                            label: const Text(
+                              "¿Olvidaste tu contraseña?",
+                              style: TextStyle(color: verde),
+                            ),
+                          ),
                         ),
-                      ),
+
+                        Center(
+                          child: TextButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const OnboardingRegistro(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(FontAwesomeIcons.userPlus,
+                                size: 16, color: verde),
+                            label: const Text(
+                              "Registrar nuevo usuario",
+                              style: TextStyle(
+                                color: verde,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: "Montserrat",
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
 
-  // ================= INPUT MODERNO =================
+  // ===== Campo contraseña =====
+  Widget _passwordField() {
+    return TextField(
+      controller: passController,
+      obscureText: _obscurePassword,
+      decoration: InputDecoration(
+        labelText: "Contraseña",
+        labelStyle: const TextStyle(
+          fontFamily: "Montserrat",
+          color: Colors.black54,
+        ),
+        prefixIcon: const Icon(FontAwesomeIcons.lock, color: Colors.black54),
+        suffixIcon: IconButton(
+          icon: Icon(
+            _obscurePassword ? FontAwesomeIcons.eye : FontAwesomeIcons.eyeSlash,
+            color: Colors.black54,
+            size: 18,
+          ),
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+        ),
+        filled: true,
+        fillColor: const Color(0xFFF6F6F6),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+
+  // ===== Campo genérico =====
   Widget _inputField({
     required String label,
     required IconData icon,

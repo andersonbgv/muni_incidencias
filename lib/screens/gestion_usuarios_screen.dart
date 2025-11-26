@@ -5,16 +5,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 class GestionUsuariosScreen extends StatelessWidget {
   const GestionUsuariosScreen({super.key});
 
-  // 🔹 Eliminar usuario de Firestore Y de Firebase Auth
-  Future<void> _eliminarUsuario(BuildContext context, String uid, String nombre) async {
+  // 🔹 Eliminar usuario de Firestore
+  Future<void> _eliminarUsuario(
+      BuildContext context, String uid, String nombre) async {
     final FirebaseFirestore db = FirebaseFirestore.instance;
-    final FirebaseAuth auth = FirebaseAuth.instance;
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar eliminación'),
-        content: Text('¿Eliminar al usuario "$nombre"? Esta acción no se puede deshacer.'),
+        content: Text(
+            '¿Eliminar al usuario "$nombre"? Esta acción no se puede deshacer.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -23,7 +24,8 @@ class GestionUsuariosScreen extends StatelessWidget {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
+            child:
+                const Text('Eliminar', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -31,15 +33,7 @@ class GestionUsuariosScreen extends StatelessWidget {
 
     if (confirm == true) {
       try {
-        // 1. Eliminar documento de Firestore
         await db.collection('usuarios').doc(uid).delete();
-
-        // 2. (Opcional) Eliminar de Firebase Authentication
-        // Solo si tienes permisos (Cloud Function recomendado en producción)
-        // await auth.currentUser?.delete(); // ⚠️ ¡No uses esto para otros usuarios!
-
-        // 👉 En apps reales, la eliminación de Auth se hace usualmente desde un Cloud Function
-        // Por ahora, solo eliminamos de Firestore.
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -65,6 +59,13 @@ class GestionUsuariosScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: verdeBandera,
         centerTitle: true,
+
+        // 🔙 AGREGADO: Flecha de retroceso
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+
         title: const Text(
           'Gestión de Usuarios',
           style: TextStyle(
@@ -77,7 +78,7 @@ class GestionUsuariosScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('usuarios')
-            .where('rol', isNotEqualTo: 'jefe') // ⚠️ Solo técnicos y usuarios
+            .where('rol', isNotEqualTo: 'jefe')
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -104,26 +105,35 @@ class GestionUsuariosScreen extends StatelessWidget {
               final data = doc.data() as Map<String, dynamic>;
               final nombre = data['nombre'] ?? 'Sin nombre';
               final correo = data['correo'] ?? 'Sin correo';
-              final rol = (data['rol'] as String?)?.toLowerCase() ?? 'usuario';
+              final rol =
+                  (data['rol'] as String?)?.toLowerCase() ?? 'usuario';
 
-              // 🔒 No mostrar al jefe actual (doble protección)
-              if (uid == uidJefeActual) return const SizedBox();
+              // 🔒 No mostrar al jefe actual
+              if (uid == uidJefeActual) return const SizedBox.shrink();
 
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 6),
                 elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: rol == 'tecnico' ? Colors.orange.shade100 : Colors.grey.shade200,
+                    backgroundColor: rol == 'tecnico'
+                        ? Colors.orange.shade100
+                        : Colors.grey.shade200,
                     child: Icon(
                       rol == 'tecnico' ? Icons.build : Icons.person,
-                      color: rol == 'tecnico' ? Colors.orange.shade800 : Colors.grey.shade700,
+                      color: rol == 'tecnico'
+                          ? Colors.orange.shade800
+                          : Colors.grey.shade700,
                     ),
                   ),
                   title: Text(
                     nombre,
-                    style: const TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontFamily: 'Montserrat',
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   subtitle: Text(
                     '$correo • ${rol.toUpperCase()}',
@@ -131,7 +141,8 @@ class GestionUsuariosScreen extends StatelessWidget {
                   ),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _eliminarUsuario(context, uid, nombre),
+                    onPressed: () =>
+                        _eliminarUsuario(context, uid, nombre),
                   ),
                 ),
               );

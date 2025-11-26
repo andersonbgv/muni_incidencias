@@ -86,8 +86,17 @@ class AuthService {
     }
   }
 
-  /// 🔹 Cierra sesión
-  Future<void> signOut() async {
-    await _auth.signOut();
+/// 🔹 Cierra sesión y elimina el fcmToken del usuario
+Future<void> signOut() async {
+  final user = _auth.currentUser;
+
+  if (user != null) {
+    // 🧹 Borrar token FCM en Firestore
+    await _firestore.collection('usuarios').doc(user.uid).update({
+      'fcmToken': FieldValue.delete(),
+    });
   }
+
+  await _auth.signOut();
+}
 }

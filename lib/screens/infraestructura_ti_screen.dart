@@ -13,15 +13,24 @@ class InfraestructuraTIScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: verdeBandera,
         centerTitle: true,
+
+        // 🔙 Flecha de retroceso agregada
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+
         title: const Text(
           'Infraestructura TI - Áreas',
           style: TextStyle(
             fontFamily: 'Montserrat',
             fontWeight: FontWeight.w600,
             color: Colors.white,
+            fontSize: 18, // 
           ),
         ),
       ),
+
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('areas').snapshots(),
         builder: (context, snapshot) {
@@ -49,6 +58,7 @@ class InfraestructuraTIScreen extends StatelessWidget {
             itemCount: areas.length,
             itemBuilder: (context, index) {
               final area = areas[index];
+
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 elevation: 3,

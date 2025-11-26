@@ -49,7 +49,7 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
     try {
       await FirebaseFirestore.instance.collection('areas').add({
         'nombre': nombreController.text.trim(),
-        'responsables': [tecnicoSeleccionado], // ✅ guardamos como lista
+        'responsables': [tecnicoSeleccionado],
         'fecha_registro': Timestamp.now(),
       });
 
@@ -68,7 +68,6 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
     }
   }
 
-  // 🔹 Validar y eliminar un área solo si no tiene equipos registrados
   Future<void> eliminarArea(String id) async {
     try {
       final equiposSnapshot = await FirebaseFirestore.instance
@@ -99,7 +98,6 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
     }
   }
 
-  // 🔹 Editar lista de responsables del área (agregar / eliminar)
   void editarResponsables(String areaId, List<dynamic> actuales) async {
     List<String> seleccionados = List<String>.from(actuales);
 
@@ -163,6 +161,13 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
       appBar: AppBar(
         backgroundColor: verdeBandera,
         centerTitle: true,
+
+        // 🔙 Flecha agregada
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+
         title: const Text(
           'Registrar Áreas',
           style: TextStyle(
@@ -172,6 +177,7 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
           ),
         ),
       ),
+
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -220,9 +226,10 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
                       items: tecnicosDisponibles.map((nombre) {
                         return DropdownMenuItem<String>(
                           value: nombre,
-                          child: Text(nombre,
-                              style:
-                                  const TextStyle(fontFamily: 'Montserrat')),
+                          child: Text(
+                            nombre,
+                            style: const TextStyle(fontFamily: 'Montserrat'),
+                          ),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -236,6 +243,7 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
                     ),
 
                     const SizedBox(height: 20),
+
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -248,8 +256,7 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
                           ),
                         ),
                         child: loading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white)
+                            ? const CircularProgressIndicator(color: Colors.white)
                             : const Text(
                                 'Registrar Área',
                                 style: TextStyle(
@@ -267,6 +274,7 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
               const SizedBox(height: 25),
               const Divider(),
               const SizedBox(height: 10),
+
               const Text(
                 'Áreas registradas',
                 style: TextStyle(
@@ -288,6 +296,7 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
+
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                       return const Center(
                         child: Text(
@@ -299,14 +308,15 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
                     }
 
                     final areas = snapshot.data!.docs;
+
                     return ListView.builder(
                       itemCount: areas.length,
                       itemBuilder: (context, index) {
                         final area = areas[index];
-                      final responsables = area.data().toString().contains('responsables')
-    ? List<String>.from(area['responsables'])
-    : [area['responsable'] ?? 'Sin técnico asignado'];
 
+                        final responsables = area.data().toString().contains('responsables')
+                            ? List<String>.from(area['responsables'])
+                            : [area['responsable'] ?? 'Sin técnico asignado'];
 
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 6),
@@ -337,8 +347,8 @@ class _RegistrarAreasScreenState extends State<RegistrarAreasScreen> {
                                   icon: const Icon(Icons.edit,
                                       color: Colors.blueAccent),
                                   tooltip: 'Editar responsables',
-                                  onPressed: () =>
-                                      editarResponsables(area.id, responsables),
+                                  onPressed: () => editarResponsables(
+                                      area.id, responsables),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.delete,
